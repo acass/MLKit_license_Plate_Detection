@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-// import 'package:firebase_ml_vision/firebase_ml_vision.dart';
+import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 
 List<CameraDescription> cameras;
+String mailAddress;
 
 void main() => runApp(MyCameraApp());
 
@@ -12,12 +14,32 @@ Future<void> _takeMyPhoto() async {
     CameraController controller = CameraController(cameras[0], ResolutionPreset.medium);
     String filePath = 'Photos/image_test.jpg';
     await controller.takePicture(filePath);
+
+    final File imageFile = File(filePath);
+    final FirebaseVisionImage visionImage = FirebaseVisionImage.fromFile(imageFile);
+
+    final TextRecognizer textRecognizer = FirebaseVision.instance.textRecognizer();
+    final VisionText visionText = await textRecognizer.processImage(visionImage);
+
+    String mailPattern = r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?)*$";
+    RegExp regEx = RegExp(mailPattern);
+
+    mailAddress = "Couldn't find any mail in the foto! Please try again!";
+
+    for (TextBlock block in visionText.blocks) {
+      for (TextLine line in block.lines) {
+        if (regEx.hasMatch(line.text)) {
+          mailAddress = line.text;
+        }
+      }
+    }
 }
 
 class MyCameraApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
       theme: ThemeData.dark(),
       home: MyHomePage(title: 'License Plate Detector'),
@@ -46,10 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              'Cool!',
+              '$mailAddress',
               style: Theme.of(context).textTheme.display1,
             ),
           ],
@@ -57,8 +76,10 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _takeMyPhoto,
+        backgroundColor: Colors.blueGrey[400],
         tooltip: 'Increment',
-        child: Icon(Icons.camera),
+        
+        child: Icon(Icons.photo_camera, size: 32, color: Colors.white,),
       ),
     );
   }
